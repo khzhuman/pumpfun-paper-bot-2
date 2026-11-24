@@ -1,10 +1,12 @@
 // Driftline — a momentum paper-trading bot for the pump.fun bonding-curve replay.
 //
-// Idea: new curves that have survived their first few hundred slots and are now
-// drawing steady, accelerating buy flow from many wallets tend to keep drifting up
-// for a while. Buy small at first, add only while the drift continues, and leave
-// quickly on a stop, a trailing stop, a fade in flow, or old age. A few tiny probe
-// round trips keep the run over the guardrail bar (20 coins) even in a dead tape.
+// Idea: most new curves dump, so entries must be rare and demanding — a curve
+// that has survived its first few hundred slots and is drawing strong,
+// accelerating buy flow from many distinct wallets tends to keep drifting up for
+// a while. One small buy per coin, no pyramiding: the edge is in picking the
+// few runners, not in sizing them. Leave quickly on a stop, a trailing stop, a
+// fade in flow, or old age. Tiny probe round trips keep the run over the
+// guardrail bar (20 coins) even in a dead tape.
 //
 // Deterministic by construction: no clock, no randomness, no environment reads.
 // Every decision is a pure function of the batches the harness has delivered, and
@@ -15,45 +17,45 @@ import { runBot, type Batch, type BotState, type OrderInput, type Pubkey } from 
 const LAMPORTS = 1_000_000_000;
 
 // --- entry gate -------------------------------------------------------------
-const ENTRY_WINDOW = 40; // slots of tape the entry signal looks at
+const ENTRY_WINDOW = 25; // slots of tape the entry signal looks at
 const MIN_AGE = 400; // slots since CreateEvent before a curve may be bought
 const MIN_REAL_SOL = 2; // real SOL on the curve at entry
 const MAX_REAL_SOL = 50;
-const MIN_NET_INFLOW_SOL = 0.8; // buys minus sells over the window, in SOL
+const MIN_NET_INFLOW_SOL = 8; // buys minus sells over the window, in SOL
 const MIN_BUY_TRADES = 3;
-const MIN_BUYERS = 4; // distinct wallets buying in the window
-const MIN_RISE = 0.04; // price now vs window start, minus 1
-const MAX_RISE = 1.2; // skip curves that already ran too far in one window
-const NEAR_HIGH = 0.92; // price now must sit at least this close to the window high
+const MIN_BUYERS = 14; // distinct wallets buying in the window
+const MIN_RISE = 0.25; // price now vs window start, minus 1
+const MAX_RISE = 0.5; // skip curves that already ran too far in one window
+const NEAR_HIGH = 0.99; // price now must sit at least this close to the window high
 const MAX_TOP_BUYER_SHARE = 0.8; // largest single buyer's share of window buy SOL
 
 // --- sizing -----------------------------------------------------------------
 const FIRST_BUY_SOL = 0.1;
 const ADD_BUY_SOL = 0.2;
-const MAX_STAKE_SOL = 1.0; // most SOL ever put into one coin
+const MAX_STAKE_SOL = 0.1; // most SOL ever put into one coin: one buy, no adds
 const MIN_BUY_SOL = 0.01;
 const MAX_MAIN_POSITIONS = 5;
 const MAX_EXPOSURE_SOL = 6;
-const BUY_SLIPPAGE_BPS = 1500;
+const BUY_SLIPPAGE_BPS = 500;
 
 // --- exits ------------------------------------------------------------------
-const STOP_LOSS = 0.12; // sell when value falls this far under cost
-const TRAIL_DROP = 0.15; // sell when value falls this far under its peak
-const TRAIL_ARM = 0.08; // trailing stop arms once value reaches cost * (1 + this)
+const STOP_LOSS = 0.08; // sell when value falls this far under cost
+const TRAIL_DROP = 0.1; // sell when value falls this far under its peak
+const TRAIL_ARM = 0.05; // trailing stop arms once value reaches cost * (1 + this)
 const FADE_WINDOW = 15; // slots
 const FADE_NET_SOL = -0.3; // exit when net flow over the fade window is worse than this
 const BIG_SELL_SOL = 3; // exit on any single recorded sell of at least this
-const MAX_HOLD_SLOTS = 600;
+const MAX_HOLD_SLOTS = 900;
 const HOLD_IF_UP = 0.2; // the hold limit does not apply while up at least this much
 const COOLDOWN_SLOTS = 200; // wait after an exit before the same curve may re-enter
 const MAX_ENTRIES_PER_COIN = 2;
 
 // --- guardrail probes -------------------------------------------------------
-const TARGET_COINS = 25;
+const TARGET_COINS = 30;
 const TARGET_FILLS = 200;
-const PACE_SECONDS = 14_400;
+const PACE_SECONDS = 7_200;
 const PROBE_SOL = 0.01;
-const MAX_PROBES = 1;
+const MAX_PROBES = 2;
 
 // Curve fee on every trade (95 protocol + 30 creator bps) plus tx fees.
 const CURVE_FEE = 0.0125;

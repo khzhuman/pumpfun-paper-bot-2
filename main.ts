@@ -37,13 +37,13 @@ const MAX_EXPOSURE_SOL = 6;
 const BUY_SLIPPAGE_BPS = 1500;
 
 // --- exits ------------------------------------------------------------------
-const STOP_LOSS = 0.25; // sell when value falls this far under cost
-const TRAIL_DROP = 0.25; // sell when value falls this far under its peak
-const TRAIL_ARM = 0.1; // trailing stop arms once value reaches cost * (1 + this)
-const FADE_WINDOW = 20; // slots
-const FADE_NET_SOL = -1; // exit when net flow over the fade window is worse than this
-const BIG_SELL_SOL = 5; // exit on any single recorded sell of at least this
-const MAX_HOLD_SLOTS = 1200;
+const STOP_LOSS = 0.12; // sell when value falls this far under cost
+const TRAIL_DROP = 0.15; // sell when value falls this far under its peak
+const TRAIL_ARM = 0.08; // trailing stop arms once value reaches cost * (1 + this)
+const FADE_WINDOW = 15; // slots
+const FADE_NET_SOL = -0.3; // exit when net flow over the fade window is worse than this
+const BIG_SELL_SOL = 3; // exit on any single recorded sell of at least this
+const MAX_HOLD_SLOTS = 600;
 const HOLD_IF_UP = 0.2; // the hold limit does not apply while up at least this much
 const COOLDOWN_SLOTS = 200; // wait after an exit before the same curve may re-enter
 const MAX_ENTRIES_PER_COIN = 2;
@@ -306,11 +306,12 @@ await runBot({
         if (!entryOk(t, now, realSol)) continue;
         want = Math.min(FIRST_BUY_SOL, MAX_STAKE_SOL);
       } else {
-        // Add only into strength: price above the last buy, position up, flow still in.
+        // Add only into strength: price stepped up from the last buy, position
+        // up, flow still in. A 5% step keeps adds off flat tops.
         if (pos.leaving || !pos.everFilled || pos.investedSol >= MAX_STAKE_SOL - MIN_BUY_SOL) continue;
         const held = state.positions.get(mint);
         if (held === undefined) continue;
-        if (price < pos.lastBuyPrice) continue;
+        if (price < pos.lastBuyPrice * 1.05) continue;
         if (pos.lastValueSol < Number(held.cost_lamports) / LAMPORTS) continue;
         if (netFlow(t, now, ENTRY_WINDOW) < MIN_NET_INFLOW_SOL) continue;
         if (realSol > MAX_REAL_SOL) continue;
